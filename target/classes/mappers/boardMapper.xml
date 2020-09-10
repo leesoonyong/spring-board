@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.board.mappers.board">
+	<!-- 게시물 목록 -->
+	<select id="list" resultType="com.board.domain.BoardVO">
+ 		SELECT bno, title, content, writer, regDate, hit FROM MYBOARD
+	</select>
+	
+	<select id="view" parameterType="int" resultType="com.board.domain.BoardVO">
+		SELECT * FROM MYBOARD WHERE bno = #{bno}
+	</select>
+	
+	<!-- 첨부파일 게시물에 뿌려주기 -->
+	<select id="selectFileList" parameterType="int" resultType="hashMap">
+		select file_no, org_file_name, round(file_size/1024,1) as file_size 
+		from myFile where bno = #{bno} and del_gb = 'n'
+		order by file_no asc
+	</select>
+	
+	<select id="selectFileInfo" parameterType="hashMap" resultType="hashMap">
+		select stored_file_name, org_file_name
+		from myFile 
+		where file_no = #{FILE_NO}
+	</select>
+	
+	<insert id="write" parameterType="com.board.domain.BoardVO" useGeneratedKeys="true" keyProperty="bno">
+		<selectKey keyProperty="bno" resultType="int" order="BEFORE">
+			select MYBOARD_SEQ.nextval from dual
+		</selectKey>	
+			INSERT INTO MYBOARD(bno,title,content,writer) 
+			values(#{bno},#{title},#{content},#{writer})
+	</insert>
+	
+	<!-- 첨부파일 업로드 -->
+	<insert id="insertFile" parameterType="hashMap">
+		insert into myFile(
+			file_no, bno, org_file_name, stored_file_name, file_size)
+		values(
+			seq_myFile_no.nextval, #{bno}, #{org_file_name}, #{stored_file_name}, #{file_size}
+			)
+			
+	</insert>
+	
+	<update id="modify" parameterType="com.board.domain.BoardVO">
+		UPDATE myboard SET 
+	        title = #{title},
+	        content = #{content},
+	        writer = #{writer}
+	    where bno = #{bno}
+	</update>
+	
+	<update id="delete" parameterType="int">
+		DELETE FROM MYBOARD WHERE bno = #{bno}
+	</update>
+	
+	<update id="updateFile" parameterType="hashMap">
+		update myFile set
+		del_gb = 'Y'
+		where file_no = ${FILE_NO}
+	</update>
+	
+	<!-- 게시판 조회수 -->
+	<update id="boardHit" parameterType="int">
+		update myBoard set 
+		hit = hit+1
+		where bno = #{bno}
+	</update>
+
+	<!-- 페이징을 위한 게시물 총 개수 -->
+	<select id="listCount" resultType="int">
+		<![CDATA[
+			SELECT COUNT(bno) FROM MYBOARD WHERE bno >0
+		]]>
+	</select>
+	<!-- 페이징 구현 -->
+	<select id="listPage" parameterType="com.board.domain.Paging" resultType="com.board.domain.BoardVO">
+		select bno, title, content, writer, regDate, hit
+		    from (
+		        select bno, title, content, writer, regDate, hit,
+		            row_number() over(order by bno desc) as rNum from myBoard
+		        )
+	    where rNum between #{rowStart} and #{rowEnd}
+	        order by bno desc
+	</select>
+	
+	<!-- 검색 -->
+	
+<!--  	
+	<sql id="search">
+		<if test="searchType !=null">
+			<if test="searchType == 't'.toString()">where title '%' || #{keyword} || '%'</if>
+			<if test="searchType == 'c'.toString()">where title '%' || #{keyword} || '%'</if>
+			<if test="searchType == 'w'.toString()">where title '%' || #{keyword} || '%'</if>
+			<if test="searchType == 'tc'.toString()">(where title '%' || #{keyword} || '%')
+													 or(content '%' || #{keyword} || '%')</if>
+		</if>
+	</sql>
+-->	
+	
+	<select id="listSearch" resultType="com.board.domain.BoardVO"
+		parameterType="com.board.domain.Search">
+		select bno, title, content, writer, regDate, hit
+		    from (
+		        select bno, title, content, writer, regDate, hit,
+		            row_number() over(order by bno desc) as rNum from myBoard
+		            <include refid="search"></include>
+		        )
+	    where rNum between #{rowStart} and #{rowEnd}
+	        order by bno desc
+	</select>
+	<sql id="search">
+		 <if test="searchType != null">
+			  <if test="searchType == 't'.toString()">where title like '%' || #{keyword} || '%'</if>
+			  <if test="searchType == 'c'.toString()">where content like '%' || #{keyword} || '%'</if>
+			  <if test="searchType == 'w'.toString()">where writer like '%' || #{keyword} || '%'</if>
+			  <if test="searchType == 'tc'.toString()">where (title like '%' || #{keyword} || '%') or (content like '%' || #{keyword} || '%')</if>
+		</if>
+	</sql>
+	
+	<!-- 검색 결과 총 개수 -->
+	<select id="countSearch" resultType="int">
+		 select count(bno)
+		  from myBoard
+		   <include refid="search"></include>
+	</select>
+	
+	
+	
+</mapper>
